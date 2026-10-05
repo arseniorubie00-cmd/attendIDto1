@@ -1,0 +1,6 @@
+{
+  "name": "AttendIDto - Smart Campus Event & Attendance System",
+  "description": "Centralized multi-device QR event attendance platform for schools and student organizations. No student ID number required, real-time target tracking, and print-ready reports.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
