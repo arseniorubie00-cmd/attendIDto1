@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AdminProfile, CampusEvent, AttendanceRecord, StudentProfile } from '../../types';
 import { LiveMonitorView } from './LiveMonitorView';
 import { ScanStationModal } from './ScanStationModal';
@@ -27,7 +27,8 @@ import {
   VolumeX,
   FileSpreadsheet,
   Download,
-  Filter
+  Filter,
+  Mail
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -52,6 +53,8 @@ interface AdminDashboardProps {
     message: string;
     alreadyCheckedIn?: boolean;
   };
+  onVerifyEmail?: (email: string, role: 'admin') => Promise<boolean>;
+  onLogout?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -61,9 +64,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   students,
   onUpdateProfile,
   onCreateEvent,
-  onScanStudent
+  onScanStudent,
+  onVerifyEmail,
+  onLogout
 }) => {
-  const [selectedEventId, setSelectedEventId] = useState<string>(() => events[0]?.id || '');
+  // Isolate events strictly to this admin's organization (Requirement 9)
+  const orgEvents = useMemo(() => {
+    return events.filter((e: CampusEvent) => 
+      e.organizerId === admin.id || 
+      (e.organization && admin.organization && e.organization.trim().toLowerCase() === admin.organization.trim().toLowerCase())
+    );
+  }, [events, admin.id, admin.organization]);
+
+  const [selectedEventId, setSelectedEventId] = useState<string>(() => orgEvents[0]?.id || '');
   const [activeTab, setActiveTab] = useState<'monitor' | 'scanner' | 'reports' | 'history'>('monitor');
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -82,15 +95,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     record?: AttendanceRecord;
   }>({ status: null, message: '' });
 
-  // Active event
-  const activeEvent = events.find(e => e.id === selectedEventId) || events[0];
+  // Active event from this organization only
+  const activeEvent = orgEvents.find((e: CampusEvent) => e.id === selectedEventId) || orgEvents[0];
 
-  // Keep selectedEventId synced when events change
+  // Keep selectedEventId synced when orgEvents change
   useEffect(() => {
-    if (events.length > 0 && (!selectedEventId || !events.some(e => e.id === selectedEventId))) {
-      setSelectedEventId(events[0].id);
+    if (orgEvents.length > 0 && (!selectedEventId || !orgEvents.some((e: CampusEvent) => e.id === selectedEventId))) {
+      setSelectedEventId(orgEvents[0].id);
     }
-  }, [events, selectedEventId]);
+  }, [orgEvents, selectedEventId]);
 
   // Audio synthesize function for scanner beep
   const playBeep = (type: 'success' | 'error') => {
@@ -159,25 +172,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // 1-Click Fast CDO Campus Event Creation
-  const handleQuickCreateEvent = () => {
-    onCreateEvent({
-      organizerId: admin.id,
-      organizerName: admin.fullName,
-      organization: admin.organization || 'USTP Student Organization',
-      school: admin.school || 'USTP-CDO (University of Science and Technology of Southern Philippines)',
-      title: 'USTP-CDO Campus Tech Summit & General Assembly 2026',
-      description: 'Annual gathering of students and campus leaders in Cagayan de Oro. Real-time attendance monitoring, zero student ID exposure, and multi-device entrance scanning.',
-      category: 'General Assembly',
-      date: new Date().toISOString().split('T')[0],
-      startTime: '08:30 AM',
-      endTime: '04:30 PM',
-      venue: 'Main Campus Gymnasium & Audio-Visual Theater',
-      targetAttendees: 500,
-      targetFilter: { departments: [], yearLevels: [], courses: [] },
-      status: 'upcoming'
-    });
-  };
+  // Email verification state for organizer
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [verificationOtp, setVerificationOtp] = useState('');
+  const [expectedOtp, setExpectedOtp] = useState('519382');
+  const [verificationSuccess, setVerificationSuccess] = useState(false);
+  const [verificationError, setVerificationError] = useState('');
 
   // Attendance for active event
   const eventAttendance = activeEvent ? attendance.filter(a => a.eventId === activeEvent.id) : [];
@@ -245,8 +245,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* Active Event Selector (When events exist) */}
-      {events.length > 0 && (
+      {/* Organizer Email Verification Banner (If Not Yet Verified) */}
+      {!admin.emailVerified && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-amber-900">
+            <Mail className="w-4 h-4 text-amber-600 shrink-0" />
+            <div>
+              <span className="font-bold">Institutional Email Verification Required: </span>
+              <span className="text-slate-600">Please verify <strong>{admin.email}</strong> to activate official OSA accreditation and notifications.</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsVerifyingEmail(true);
+              const code = Math.floor(100000 + Math.random() * 900000).toString();
+              setExpectedOtp(code);
+              setVerificationError('');
+            }}
+            className="py-1.5 px-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition-colors cursor-pointer shrink-0 shadow-2xs"
+          >
+            Verify Email
+          </button>
+        </div>
+      )}
+
+      {/* Active Event Selector (When events exist for this org) */}
+      {orgEvents.length > 0 ? (
         <div className="p-4 bg-slate-100/80 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-700">Active Campus Event:</span>
@@ -255,7 +280,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onChange={(e) => setSelectedEventId(e.target.value)}
               className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-slate-900"
             >
-              {events.map(ev => (
+              {orgEvents.map(ev => (
                 <option key={ev.id} value={ev.id}>
                   {ev.title} ({ev.date}) — Target: {ev.targetAttendees}
                 </option>
@@ -276,6 +301,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {eventAttendance.length} Checked In
             </span>
           </div>
+        </div>
+      ) : (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between text-xs text-amber-900">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>No events published yet for <strong>{admin.organization}</strong>. Create an event to begin.</span>
+          </div>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="px-3 py-1 bg-slate-900 text-white font-bold rounded-xl text-xs hover:bg-slate-800 cursor-pointer"
+          >
+            + Create Event (₱250)
+          </button>
         </div>
       )}
 
@@ -328,7 +366,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }`}
         >
           <History className="w-3.5 h-3.5" />
-          <span>Event History & Management ({events.length})</span>
+          <span>Event History & Management ({orgEvents.length})</span>
         </button>
       </div>
 
@@ -337,7 +375,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         activeEvent ? (
           <LiveMonitorView
             activeEvent={activeEvent}
-            allEvents={events}
+            allEvents={orgEvents}
             attendance={attendance}
             onSelectEvent={(ev) => setSelectedEventId(ev.id)}
             onOpenScanner={() => setActiveTab('scanner')}
@@ -351,23 +389,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="space-y-1">
               <h2 className="text-xl font-bold text-slate-900">Ready to Launch Your First Campus Event</h2>
               <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-                Create an event to activate live quota monitoring, multi-device tap scanning, and auto-sorted print rosters.
+                Create an event for {admin.organization} to activate live quota monitoring, multi-device tap scanning, and auto-sorted print rosters.
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
               <button
                 onClick={() => setIsCreateModalOpen(true)}
-                className="py-2.5 px-5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
+                className="py-2.5 px-5 text-xs font-bold text-slate-950 bg-[#d0f344] hover:bg-[#bde532] rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
               >
                 <PlusCircle className="w-4 h-4" />
-                <span>+ Custom Event</span>
-              </button>
-              <button
-                onClick={handleQuickCreateEvent}
-                className="py-2.5 px-5 text-xs font-extrabold text-slate-950 bg-[#d0f344] hover:bg-[#bde532] rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
-              >
-                <CheckCircle2 className="w-4 h-4 text-slate-950" />
-                <span>1-Click Launch CDO Campus Summit</span>
+                <span>+ Create Event (₱250 Activation)</span>
               </button>
             </div>
           </div>
@@ -684,14 +715,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
 
-          {events.length === 0 ? (
+          {orgEvents.length === 0 ? (
             <div className="text-center py-12 text-slate-400 text-xs">
               <History className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-              No events in history. Create an event to begin tracking attendance.
+              No events found for {admin.organization}. Create an event to begin tracking attendance.
             </div>
           ) : (
             <div className="space-y-3">
-              {events.map(ev => {
+              {orgEvents.map(ev => {
                 const count = attendance.filter(a => a.eventId === ev.id).length;
                 const pct = Math.min(100, Math.round((count / (ev.targetAttendees || 1)) * 100));
 
@@ -801,7 +832,107 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onClose={() => setIsProfileModalOpen(false)}
         admin={admin}
         onUpdateProfile={onUpdateProfile}
+        onLogout={onLogout}
       />
+
+      {/* Organizer Email Verification Modal */}
+      {isVerifyingEmail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Verify Organization Email</h3>
+                  <p className="text-[11px] text-slate-500">{admin.email}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsVerifyingEmail(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {verificationSuccess ? (
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
+                <h4 className="text-sm font-bold text-emerald-900">Email Verified!</h4>
+                <p className="text-xs text-emerald-700">Official accreditation confirmed for {admin.organization}.</p>
+              </div>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (verificationOtp.trim() !== expectedOtp.trim()) {
+                    setVerificationError('Invalid verification code. Please check or use auto-fill.');
+                    return;
+                  }
+                  if (onVerifyEmail) {
+                    await onVerifyEmail(admin.email, 'admin');
+                  }
+                  onUpdateProfile(admin.id, { emailVerified: true });
+                  setVerificationSuccess(true);
+                  setTimeout(() => {
+                    setIsVerifyingEmail(false);
+                    setVerificationSuccess(false);
+                  }, 1200);
+                }}
+                className="space-y-4"
+              >
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1">
+                  <div>Enter the 6-digit code sent to your official email:</div>
+                  <div className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded inline-block">
+                    Verification Code: {expectedOtp}
+                  </div>
+                </div>
+
+                {verificationError && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{verificationError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    6-Digit Verification Code
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={verificationOtp}
+                    onChange={(e) => setVerificationOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="e.g. 519382"
+                    className="w-full px-3 py-2 text-center text-lg font-mono font-bold tracking-widest bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-slate-900"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVerificationOtp(expectedOtp)}
+                    className="py-2 px-3 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
+                  >
+                    Auto-Fill Code
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 px-4 text-xs font-bold text-slate-950 bg-[#d0f344] hover:bg-[#bde532] rounded-xl cursor-pointer transition-colors"
+                  >
+                    Confirm Verification
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { StudentProfile, CampusEvent, AttendanceRecord, AppNotification } from '../../types';
 import { QRCodeCanvas } from '../common/QRCodeCanvas';
 import { DEPARTMENTS, COURSES, YEAR_LEVELS } from '../../data/initialData';
@@ -21,7 +21,14 @@ import {
   Filter,
   Layers,
   History,
-  ShieldCheck
+  ShieldCheck,
+  Upload,
+  Camera,
+  Image as ImageIcon,
+  LogOut,
+  Check,
+  Mail,
+  KeyRound
 } from 'lucide-react';
 
 interface StudentDashboardProps {
@@ -32,7 +39,10 @@ interface StudentDashboardProps {
   onUpdateProfile: (id: string, updates: Partial<StudentProfile>) => void;
   onOpenPassModal: () => void;
   onMarkNotificationRead: (id: string) => void;
+  onMarkAllNotificationsRead?: (userId?: string) => void;
+  onVerifyEmail?: (email: string, role: 'student') => Promise<boolean>;
   onToggleSaveEvent?: (studentId: string, eventId: string) => void;
+  onLogout?: () => void;
 }
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({
@@ -43,9 +53,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   onUpdateProfile,
   onOpenPassModal,
   onMarkNotificationRead,
-  onToggleSaveEvent
+  onMarkAllNotificationsRead,
+  onVerifyEmail,
+  onToggleSaveEvent,
+  onLogout
 }) => {
   const [activeTab, setActiveTab] = useState<'pass' | 'events' | 'history' | 'notifications' | 'profile'>('pass');
+  
+  // Email verification state
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [verificationOtp, setVerificationOtp] = useState('');
+  const [expectedOtp, setExpectedOtp] = useState('839214');
+  const [otpSent, setOtpSent] = useState(false);
+  const [verificationSuccess, setVerificationSuccess] = useState(false);
+  const [verificationError, setVerificationError] = useState('');
   
   // Events Tab Sub-view
   const [eventsSubTab, setEventsSubTab] = useState<'browse' | 'saved'>('browse');
@@ -54,12 +75,29 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [schoolFilter, setSchoolFilter] = useState<string>('my-school');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Notifications Filter State (All vs Unread)
+  const [notifFilter, setNotifFilter] = useState<'all' | 'unread'>('all');
+
   // Profile form state
   const [yearLevel, setYearLevel] = useState(student.yearLevel);
   const [department, setDepartment] = useState(student.department);
   const [course, setCourse] = useState(student.course);
   const [avatarUrl, setAvatarUrl] = useState(student.avatarUrl || '');
   const [profileSaved, setProfileSaved] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === 'string') {
+        setAvatarUrl(event.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   // Student's real verified attendance records
   const studentAttendance = useMemo(() => {
@@ -156,9 +194,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       
       {/* Top Banner / Student Identity Bar */}
-      <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-6 bg-white rounded-2xl border border-blue-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xl overflow-hidden border border-indigo-200 shrink-0">
+          <div className="w-14 h-14 rounded-2xl bg-[#0a1f3d] text-[#fbbf24] flex items-center justify-center font-bold text-xl overflow-hidden border border-blue-900 shrink-0">
             {student.avatarUrl ? (
               <img src={student.avatarUrl} alt={student.fullName} className="w-full h-full object-cover" />
             ) : (
@@ -170,8 +208,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                 {student.fullName}
               </h1>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              <span className="text-[11px] font-semibold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-blue-200">
+                <CheckCircle2 className="w-3 h-3 text-blue-600" />
                 Verified Student
               </span>
             </div>
@@ -184,12 +222,38 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         {/* Quick Pass Trigger Button */}
         <button
           onClick={onOpenPassModal}
-          className="px-4 py-2.5 text-xs font-bold text-slate-950 bg-[#d0f344] hover:bg-[#bde532] rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 self-start md:self-auto cursor-pointer"
+          className="px-4 py-2.5 text-xs font-extrabold text-blue-950 bg-[#fbbf24] hover:bg-[#f59e0b] rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 self-start md:self-auto cursor-pointer"
         >
-          <QrCode className="w-4 h-4 text-slate-950" />
+          <QrCode className="w-4 h-4 text-blue-950" />
           <span>Present Student Pass (QR)</span>
         </button>
       </div>
+
+      {/* Email Verification Banner (If Not Yet Verified) */}
+      {!student.emailVerified && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-amber-900">
+            <Mail className="w-4 h-4 text-amber-600 shrink-0" />
+            <div>
+              <span className="font-bold">Email Verification Needed: </span>
+              <span className="text-slate-600">Verify <strong>{student.email}</strong> to ensure campus notices and RSVP confirmations reach your account.</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsVerifyingEmail(true);
+              const code = Math.floor(100000 + Math.random() * 900000).toString();
+              setExpectedOtp(code);
+              setOtpSent(true);
+              setVerificationError('');
+            }}
+            className="py-1.5 px-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition-colors cursor-pointer shrink-0 shadow-2xs"
+          >
+            Verify Email
+          </button>
+        </div>
+      )}
 
       {/* Navigation Sub-Tabs */}
       <div className="flex items-center gap-2 p-1 bg-slate-200/80 rounded-xl max-w-fit overflow-x-auto">
@@ -197,11 +261,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           onClick={() => setActiveTab('pass')}
           className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'pass'
-              ? 'bg-white text-slate-900 shadow-xs font-bold'
+              ? 'bg-white text-blue-950 shadow-xs font-bold'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <QrCode className="w-3.5 h-3.5 text-indigo-600" />
+          <QrCode className="w-3.5 h-3.5 text-blue-700" />
           <span>My Student Pass</span>
         </button>
 
@@ -209,11 +273,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           onClick={() => setActiveTab('events')}
           className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'events'
-              ? 'bg-white text-slate-900 shadow-xs font-bold'
+              ? 'bg-white text-blue-950 shadow-xs font-bold'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+          <Calendar className="w-3.5 h-3.5 text-blue-700" />
           <span>Campus Events Directory ({events.length})</span>
         </button>
 
@@ -221,23 +285,31 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           onClick={() => setActiveTab('history')}
           className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'history'
-              ? 'bg-white text-slate-900 shadow-xs font-bold'
+              ? 'bg-white text-blue-950 shadow-xs font-bold'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <History className="w-3.5 h-3.5 text-indigo-600" />
+          <History className="w-3.5 h-3.5 text-blue-700" />
           <span>Attendance History ({studentAttendance.length})</span>
         </button>
 
         <button
-          onClick={() => setActiveTab('notifications')}
+          onClick={() => {
+            setActiveTab('notifications');
+            // Instantly clear unread state and persist to server
+            if (onMarkAllNotificationsRead) {
+              onMarkAllNotificationsRead(student.id);
+            } else {
+              studentNotifs.filter(n => !n.read).forEach(n => onMarkNotificationRead(n.id));
+            }
+          }}
           className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap relative cursor-pointer ${
             activeTab === 'notifications'
-              ? 'bg-white text-slate-900 shadow-xs font-bold'
+              ? 'bg-white text-blue-950 shadow-xs font-bold'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Bell className="w-3.5 h-3.5 text-indigo-600" />
+          <Bell className="w-3.5 h-3.5 text-blue-700" />
           <span>Notifications</span>
           {studentNotifs.filter(n => !n.read).length > 0 && (
             <span className="w-2 h-2 rounded-full bg-rose-500"></span>
@@ -248,11 +320,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           onClick={() => setActiveTab('profile')}
           className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'profile'
-              ? 'bg-white text-slate-900 shadow-xs font-bold'
+              ? 'bg-white text-blue-950 shadow-xs font-bold'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <User className="w-3.5 h-3.5 text-indigo-600" />
+          <User className="w-3.5 h-3.5 text-blue-700" />
           <span>Profile & Settings</span>
         </button>
       </div>
@@ -268,19 +340,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 <div className="text-xs font-bold text-slate-900">{student.school}</div>
                 <div className="text-[11px] text-slate-500">AttendIDto Tokenized QR Pass</div>
               </div>
-              <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              <span className="text-[11px] font-mono text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 font-bold">
                 ACTIVE PASS
               </span>
             </div>
 
             {/* QR Canvas Display */}
-            <div className="relative inline-block p-4 bg-slate-950 rounded-2xl shadow-inner border border-slate-800">
+            <div className="relative inline-block p-4 bg-[#07162c] rounded-2xl shadow-inner border border-blue-900">
               <QRCodeCanvas
                 value={student.qrCodeToken}
                 size={220}
                 className="rounded-lg shadow-sm"
               />
-              <div className="text-[10px] font-mono text-[#d0f344] mt-2 tracking-wider">
+              <div className="text-[10px] font-mono text-[#fbbf24] mt-2 tracking-wider font-bold">
                 NO STUDENT ID DISPLAYED
               </div>
             </div>
@@ -298,9 +370,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             <div className="pt-2">
               <button
                 onClick={onOpenPassModal}
-                className="w-full py-2.5 px-4 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-2.5 px-4 text-xs font-bold text-white bg-[#0a1f3d] hover:bg-[#07162c] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 border border-blue-900 shadow-xs"
               >
-                <Maximize2 className="w-4 h-4 text-[#d0f344]" />
+                <Maximize2 className="w-4 h-4 text-[#fbbf24]" />
                 <span>Open Fullscreen Kiosk Pass</span>
               </button>
             </div>
@@ -310,7 +382,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           <div className="md:col-span-6 space-y-6">
             <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-4">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <ShieldCheck className="w-4 h-4 text-blue-600" />
                 Zero Student ID Number Exposure
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
@@ -322,18 +394,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                   <div className="text-[11px] text-slate-500">Events Attended</div>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
-                  <div className="text-xl font-bold text-indigo-600">{(student.savedEventIds || []).length}</div>
+                  <div className="text-xl font-bold text-blue-700">{(student.savedEventIds || []).length}</div>
                   <div className="text-[11px] text-slate-500">My RSVP'd Events</div>
                 </div>
               </div>
             </div>
 
-            <div className="p-6 bg-slate-900 text-white rounded-3xl border border-slate-800 space-y-3">
+            <div className="p-6 bg-[#0a1f3d] text-white rounded-3xl border border-blue-900 space-y-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Building className="w-4 h-4 text-[#d0f344]" />
+                <Building className="w-4 h-4 text-[#fbbf24]" />
                 Multi-Organization Safety
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-blue-200/80 leading-relaxed">
                 Campus organizations can only verify attendance when you present this QR pass at their official event scan station. Events from other clubs or colleges will never be automatically charged or forced onto your attendance records.
               </p>
             </div>
@@ -562,7 +634,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 </p>
                 <button
                   onClick={() => setEventsSubTab('browse')}
-                  className="py-2 px-4 text-xs font-bold text-slate-950 bg-[#d0f344] hover:bg-[#bde532] rounded-xl cursor-pointer"
+                  className="py-2 px-4 text-xs font-bold text-blue-950 bg-[#fbbf24] hover:bg-[#f59e0b] rounded-xl cursor-pointer"
                 >
                   Browse Events Directory
                 </button>
@@ -584,7 +656,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
                       <div>
                         <h3 className="text-sm font-bold text-slate-900">{evt.title}</h3>
-                        <div className="text-xs text-indigo-900 font-medium">{evt.organization}</div>
+                        <div className="text-xs text-blue-950 font-medium">{evt.organization}</div>
                       </div>
 
                       <div className="pt-2 border-t border-slate-100 space-y-1 text-xs text-slate-600">
@@ -649,7 +721,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               </p>
               <button
                 onClick={onOpenPassModal}
-                className="py-2 px-4 text-xs font-bold text-slate-950 bg-[#d0f344] hover:bg-[#bde532] rounded-xl cursor-pointer"
+                className="py-2 px-4 text-xs font-bold text-blue-950 bg-[#fbbf24] hover:bg-[#f59e0b] rounded-xl cursor-pointer"
               >
                 View My Pass
               </button>
@@ -700,46 +772,123 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         </div>
       )}
 
-      {/* TAB 4: NOTIFICATIONS */}
+      {/* TAB 4: NOTIFICATIONS (WITH READ / UNREAD FILTER & NO PERMANENT RED DOT) */}
       {activeTab === 'notifications' && (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
-          <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">
-            Notifications & Announcements
-          </h2>
-
-          {studentNotifs.length === 0 ? (
-            <div className="py-12 text-center text-xs text-slate-400">
-              <Bell className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              No notifications yet.
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 sm:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Notifications & Announcements
+              </h2>
+              <p className="text-xs text-slate-500">
+                Official announcements and scan confirmations for your account.
+              </p>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {studentNotifs.map(n => (
-                <div
-                  key={n.id}
-                  onClick={() => onMarkNotificationRead(n.id)}
-                  className={`p-4 rounded-2xl border text-xs transition-colors cursor-pointer ${
-                    n.read
-                      ? 'bg-slate-50 border-slate-200 text-slate-600'
-                      : 'bg-indigo-50/70 border-indigo-200 text-slate-900 font-medium'
+
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              {/* Filter Tabs: All vs Unread */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setNotifFilter('all')}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    notifFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <div className="font-bold mb-0.5">{n.title}</div>
-                  <div className="text-slate-600">{n.message}</div>
-                </div>
-              ))}
+                  All ({studentNotifs.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNotifFilter('unread')}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    notifFilter === 'unread'
+                      ? 'bg-white text-slate-900 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Unread ({studentNotifs.filter(n => !n.read).length})
+                </button>
+              </div>
+
+              {studentNotifs.some(n => !n.read) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onMarkAllNotificationsRead) {
+                      onMarkAllNotificationsRead(student.id);
+                    } else {
+                      studentNotifs.filter(n => !n.read).forEach(n => onMarkNotificationRead(n.id));
+                    }
+                  }}
+                  className="py-1.5 px-3 text-xs font-semibold text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Mark all as read</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {studentNotifs.filter(n => notifFilter === 'unread' ? !n.read : true).length === 0 ? (
+            <div className="py-16 text-center space-y-2">
+              <Bell className="w-10 h-10 text-slate-300 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-700">
+                {notifFilter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {notifFilter === 'unread' ? 'All your notifications have been marked as read.' : 'You will receive notifications when new events are published.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {studentNotifs
+                .filter(n => notifFilter === 'unread' ? !n.read : true)
+                .map(n => (
+                  <div
+                    key={n.id}
+                    onClick={() => onMarkNotificationRead(n.id)}
+                    className={`p-4 rounded-2xl border text-xs transition-all cursor-pointer flex items-start justify-between gap-3 ${
+                      n.read
+                        ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100/60'
+                        : 'bg-blue-50/80 border-blue-200 text-slate-900 shadow-xs ring-1 ring-blue-200/60'
+                    }`}
+                  >
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {!n.read && (
+                          <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
+                        )}
+                        <span className={`font-bold ${n.read ? 'text-slate-800' : 'text-blue-950 font-extrabold'}`}>
+                          {n.title}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          · {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <div className="text-slate-600 pl-4">{n.message}</div>
+                    </div>
+
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full shrink-0 ${
+                      n.read ? 'bg-slate-200 text-slate-600' : 'bg-blue-900 text-white font-bold'
+                    }`}>
+                      {n.read ? 'Read' : 'New'}
+                    </span>
+                  </div>
+                ))}
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 5: PROFILE & SETTINGS */}
+      {/* TAB 5: PROFILE & SETTINGS (PHOTO EDITING & LOCKED INSTITUTIONAL DATA) */}
       {activeTab === 'profile' && (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 sm:p-8 space-y-6 max-w-2xl mx-auto">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Student Profile Information</h2>
             <p className="text-xs text-slate-500">
-              Update your department, degree program, and year level. Full name and school are locked to preserve attendance authenticity.
+              Update your photo, academic department, and degree program. Full name and school are locked to preserve institutional records.
             </p>
           </div>
 
@@ -750,73 +899,165 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             </div>
           )}
 
-          <form onSubmit={handleSaveProfile} className="space-y-4">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-xs">
-              <div className="flex items-center justify-between text-slate-500">
-                <span>Non-Editable Institutional Data:</span>
-                <Lock className="w-3.5 h-3.5 text-slate-400" />
-              </div>
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Full Name:</span>
-                  <span className="font-bold text-slate-900">{student.fullName}</span>
+          <form onSubmit={handleSaveProfile} className="space-y-5">
+            
+            {/* Profile Picture Upload Section */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-center gap-4">
+              <div className="relative group shrink-0">
+                <div className="w-20 h-20 rounded-2xl bg-[#0a1f3d] text-white flex items-center justify-center text-xl font-bold overflow-hidden border-2 border-blue-900 shadow-sm">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={student.fullName} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-8 h-8 text-[#fbbf24]" />
+                  )}
                 </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">CDO School / University:</span>
-                  <span className="font-bold text-slate-900">{student.school}</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 p-1.5 bg-[#fbbf24] text-blue-950 rounded-xl shadow-sm hover:scale-105 transition-transform cursor-pointer"
+                  title="Upload New Photo"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Department / College
-              </label>
-              <select
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900"
-              >
-                {DEPARTMENTS.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
+              <div className="space-y-2 flex-1 text-center sm:text-left">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">Student Profile Picture</h4>
+                  <p className="text-[11px] text-slate-500">
+                    Upload a clear photo or select a picture from your device gallery.
+                  </p>
+                </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Degree Program / Course
-              </label>
-              <select
-                value={course}
-                onChange={(e) => setCourse(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900"
-              >
-                {COURSES.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Year Level
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {YEAR_LEVELS.map(yr => (
+                <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
                   <button
-                    key={yr}
                     type="button"
-                    onClick={() => setYearLevel(yr)}
-                    className={`py-2 text-xs rounded-xl border font-bold transition-all cursor-pointer ${
-                      yearLevel === yr
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                    }`}
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 transition-colors cursor-pointer flex items-center gap-1.5"
                   >
-                    {yr}
+                    <Upload className="w-3.5 h-3.5 text-blue-700" />
+                    <span>Upload Photo</span>
                   </button>
-                ))}
+
+                  {avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setAvatarUrl('')}
+                      className="py-1.5 px-2.5 text-xs text-rose-600 hover:text-rose-700 font-medium cursor-pointer"
+                    >
+                      Remove Photo
+                    </button>
+                  )}
+                </div>
+
+                {/* Hidden File Input */}
+                <input
+                  type="file"
+                  ref={avatarInputRef}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarFile}
+                />
+              </div>
+            </div>
+
+            {/* Non-Editable Institutional Data (Name, School, Email Locked) */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 text-xs">
+              <div className="flex items-center justify-between text-slate-600">
+                <span className="font-bold flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-slate-400" />
+                  Institutional Identity (Non-Editable)
+                </span>
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  Verified Identity
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">Full Name (Official Record):</span>
+                  <input
+                    type="text"
+                    disabled
+                    value={student.fullName}
+                    className="w-full mt-1 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700 cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">CDO School / University:</span>
+                  <input
+                    type="text"
+                    disabled
+                    value={student.school}
+                    className="w-full mt-1 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700 cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[10px] text-slate-400 block font-medium">Institutional Email:</span>
+                <input
+                  type="text"
+                  disabled
+                  value={student.email}
+                  className="w-full mt-1 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-600 font-mono text-xs cursor-not-allowed"
+                />
+              </div>
+            </div>
+
+            {/* Editable Academic Details */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Department / College
+                </label>
+                <select
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
+                >
+                  {DEPARTMENTS.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Degree Program / Course
+                </label>
+                <select
+                  value={course}
+                  onChange={(e) => setCourse(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
+                >
+                  {COURSES.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Year Level
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {YEAR_LEVELS.map(yr => (
+                    <button
+                      key={yr}
+                      type="button"
+                      onClick={() => setYearLevel(yr)}
+                      className={`py-2 text-xs rounded-xl border font-bold transition-all cursor-pointer ${
+                        yearLevel === yr
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {yr}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -827,6 +1068,121 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               Save Profile Changes
             </button>
           </form>
+
+          {/* Secondary Account Switch (Tucked neatly in profile, like GCash) */}
+          {onLogout && (
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-400">Account session active</span>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="text-slate-600 hover:text-slate-900 font-semibold cursor-pointer flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Switch Account</span>
+              </button>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* Email Verification Modal */}
+      {isVerifyingEmail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Verify Institutional Email</h3>
+                  <p className="text-[11px] text-slate-500">{student.email}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsVerifyingEmail(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {verificationSuccess ? (
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
+                <h4 className="text-sm font-bold text-emerald-900">Email Verified!</h4>
+                <p className="text-xs text-emerald-700">Your institutional email is now verified.</p>
+              </div>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (verificationOtp.trim() !== expectedOtp.trim()) {
+                    setVerificationError('Invalid verification code. Please check or use auto-fill.');
+                    return;
+                  }
+                  if (onVerifyEmail) {
+                    await onVerifyEmail(student.email, 'student');
+                  }
+                  onUpdateProfile(student.id, { emailVerified: true });
+                  setVerificationSuccess(true);
+                  setTimeout(() => {
+                    setIsVerifyingEmail(false);
+                    setVerificationSuccess(false);
+                  }, 1200);
+                }}
+                className="space-y-4"
+              >
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1">
+                  <div>Enter the 6-digit code sent to your email address:</div>
+                  <div className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded inline-block">
+                    Verification Code: {expectedOtp}
+                  </div>
+                </div>
+
+                {verificationError && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{verificationError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    6-Digit Verification Code
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={verificationOtp}
+                    onChange={(e) => setVerificationOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="e.g. 839214"
+                    className="w-full px-3 py-2 text-center text-lg font-mono font-bold tracking-widest bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-slate-900"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVerificationOtp(expectedOtp)}
+                    className="py-2 px-3 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
+                  >
+                    Auto-Fill Code
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 px-4 text-xs font-bold text-slate-950 bg-[#d0f344] hover:bg-[#bde532] rounded-xl cursor-pointer transition-colors"
+                  >
+                    Confirm Verification
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       )}
 

@@ -69,43 +69,43 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#051122]/85 backdrop-blur-xs animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-md bg-[#121722] text-white rounded-3xl shadow-2xl border border-slate-800 overflow-hidden"
+        className="w-full max-w-md bg-[#0a1f3d] text-white rounded-3xl shadow-2xl border border-blue-900/90 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 pb-4 border-b border-slate-800/80 relative">
+        <div className="p-6 pb-4 border-b border-blue-900/60 relative">
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            className="absolute top-5 right-5 p-1 text-blue-300 hover:text-white rounded-lg hover:bg-blue-900/60 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
 
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-[#07162c] border border-blue-800 flex items-center justify-center">
               <svg viewBox="0 0 32 32" className="w-4 h-4" aria-hidden="true">
                 <path d="m7 24 9-19 9 19M11 17h10" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="25" cy="6" r="3" fill="#d0f344" />
+                <circle cx="25" cy="6" r="3" fill="#fbbf24" />
               </svg>
             </div>
             <span className="text-base font-extrabold text-white">
-              Attend<span className="text-[#d0f344]">IDto</span>
+              Attend<span className="text-[#fbbf24]">IDto</span>
             </span>
           </div>
 
           <h2 className="text-xl font-extrabold text-white tracking-tight">
             {activeRole === 'admin' ? 'Organizer Sign In' : 'Student Sign In'}
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-blue-200/80 mt-0.5">
             {activeRole === 'admin'
               ? 'Campus student councils, organizations & event managers in CDO.'
               : 'Sign in to access your student attendance profile and pass.'}
           </p>
 
           {/* Role Segment Toggle */}
-          <div className="grid grid-cols-2 p-1 bg-slate-900 rounded-xl gap-1 mt-4 border border-slate-800">
+          <div className="grid grid-cols-2 p-1 bg-[#061426] rounded-xl gap-1 mt-4 border border-blue-900/80">
             <button
               type="button"
               onClick={() => {
@@ -115,8 +115,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               }}
               className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 activeRole === 'admin'
-                  ? 'bg-[#d0f344] text-slate-950 shadow-xs font-extrabold'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-[#fbbf24] text-blue-950 shadow-xs font-extrabold'
+                  : 'text-blue-200 hover:text-white'
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -132,8 +132,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               }}
               className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 activeRole === 'student'
-                  ? 'bg-[#d0f344] text-slate-950 shadow-xs font-extrabold'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-[#fbbf24] text-blue-950 shadow-xs font-extrabold'
+                  : 'text-blue-200 hover:text-white'
               }`}
             >
               <User className="w-3.5 h-3.5" />
@@ -156,7 +156,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   <button
                     type="button"
                     onClick={() => onSwitchToRegister(activeRole)}
-                    className="w-full py-1.5 px-3 bg-[#d0f344] text-slate-950 font-bold rounded-lg text-xs hover:bg-[#bde532] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-full py-1.5 px-3 bg-[#fbbf24] text-blue-950 font-bold rounded-lg text-xs hover:bg-[#f59e0b] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
                     <span>Sign Up as {activeRole === 'admin' ? 'Organizer' : 'Student'} Now</span>
@@ -173,11 +173,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-blue-100 mb-1">
                 {activeRole === 'admin' ? 'Organizer Institutional Email' : 'Student Institutional Email'}
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-blue-300">
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
@@ -185,7 +185,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={activeRole === 'admin' ? 'organizer@ustp.edu.ph / xu.edu.ph' : 'student@xu.edu.ph / ustp.edu.ph'}
-                  className="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-hidden focus:ring-1 focus:ring-[#d0f344] focus:border-[#d0f344] placeholder:text-slate-500"
+                  className="w-full pl-9 pr-3 py-2.5 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white focus:outline-hidden focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24] placeholder:text-blue-300/50"
                   required
                 />
               </div>
@@ -193,19 +193,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-slate-300">
+                <label className="block text-xs font-semibold text-blue-100">
                   Password
                 </label>
                 <button
                   type="button"
                   onClick={onOpenForgotPassword}
-                  className="text-xs text-slate-400 hover:text-white cursor-pointer"
+                  className="text-xs text-blue-300 hover:text-white cursor-pointer"
                 >
                   Forgot password?
                 </button>
               </div>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-blue-300">
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
@@ -213,13 +213,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full pl-9 pr-10 py-2.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-hidden focus:ring-1 focus:ring-[#d0f344] focus:border-[#d0f344] placeholder:text-slate-500"
+                  className="w-full pl-9 pr-10 py-2.5 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white focus:outline-hidden focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24] placeholder:text-blue-300/50"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-blue-300 hover:text-white cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -228,20 +228,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
             <button
               type="submit"
-              className="w-full py-2.5 px-4 text-xs font-extrabold text-slate-950 bg-[#d0f344] hover:bg-[#bde532] rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+              className="w-full py-2.5 px-4 text-xs font-extrabold text-blue-950 bg-[#fbbf24] hover:bg-[#f59e0b] rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
             >
               <span>Sign In as {activeRole === 'admin' ? 'Organizer' : 'Student'}</span>
-              <ArrowUpRight className="w-4 h-4 text-slate-950" />
+              <ArrowUpRight className="w-4 h-4 text-blue-950" />
             </button>
           </form>
 
           {/* Switch to Register / Sign Up */}
-          <div className="pt-3 border-t border-slate-800 text-center text-xs text-slate-400">
+          <div className="pt-3 border-t border-blue-900/60 text-center text-xs text-blue-200/80">
             Don't have an account yet?{' '}
             <button
               type="button"
               onClick={() => onSwitchToRegister(activeRole)}
-              className="text-[#d0f344] hover:underline font-bold cursor-pointer inline-flex items-center gap-1"
+              className="text-[#fbbf24] hover:underline font-bold cursor-pointer inline-flex items-center gap-1"
             >
               <span>Sign Up as {activeRole === 'admin' ? 'Organizer' : 'Student'}</span>
               <ArrowUpRight className="w-3.5 h-3.5" />

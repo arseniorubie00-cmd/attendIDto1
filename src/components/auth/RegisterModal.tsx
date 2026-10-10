@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserRole } from '../../types';
 import { UNIVERSITIES, DEPARTMENTS, COURSES, YEAR_LEVELS } from '../../data/initialData';
-import { X, Lock, Mail, User, School, Building, ShieldCheck, AlertCircle } from 'lucide-react';
+import { X, Lock, Mail, User, School, Building, ShieldCheck, AlertCircle, CheckCircle2, KeyRound } from 'lucide-react';
 
 interface RegisterModalProps {
   isOpen: boolean;
@@ -40,7 +40,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   onSwitchToLogin
 }) => {
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
-  const [step, setStep] = useState<'credentials' | 'profile'>('credentials');
+  const [step, setStep] = useState<'credentials' | 'profile' | 'verification'>('credentials');
 
   // Shared Fields
   const [fullName, setFullName] = useState('');
@@ -59,11 +59,19 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const [organization, setOrganization] = useState('');
   const [position, setPosition] = useState('President');
 
+  // Email Verification State
+  const [generatedOtp, setGeneratedOtp] = useState('742918');
+  const [enteredOtp, setEnteredOtp] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [otpError, setOtpError] = useState('');
+
   useEffect(() => {
     if (isOpen) {
       setActiveRole(initialRole);
       setStep('credentials');
       setErrorMsg('');
+      setOtpError('');
+      setEnteredOtp('');
     }
   }, [initialRole, isOpen]);
 
@@ -71,7 +79,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
   const resolvedSchool = school === 'Other' ? customSchool : school;
 
-  const handleNextStep = (e: React.FormEvent) => {
+  const handleNextToProfile = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -99,9 +107,31 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     setStep('profile');
   };
 
-  const handleCompleteRegistration = async (e: React.FormEvent) => {
+  const handleProceedToVerification = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(newOtp);
+    setEnteredOtp('');
+    setOtpError('');
+    setStep('verification');
+  };
+
+  const handleVerifyEmailAndComplete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOtpError('');
+
+    if (!enteredOtp.trim()) {
+      setOtpError('Please enter the 6-digit code sent to your email.');
+      return;
+    }
+
+    if (enteredOtp.trim() !== generatedOtp.trim()) {
+      setOtpError('Invalid code. Please check your verification code or click auto-fill.');
+      return;
+    }
+
+    setIsVerifying(true);
 
     try {
       if (activeRole === 'student') {
@@ -131,114 +161,117 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         }
       }
     } catch {
-      setErrorMsg('Failed to complete registration. Please try again.');
+      setOtpError('Failed to complete registration. Please try again.');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#051122]/85 backdrop-blur-xs animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-lg bg-[#121722] text-white rounded-3xl shadow-2xl border border-slate-800 overflow-hidden max-h-[92vh] flex flex-col"
+        className="w-full max-w-lg bg-[#0a1f3d] text-white rounded-3xl shadow-2xl border border-blue-900/90 overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 pb-4 border-b border-slate-800/80 relative shrink-0">
+        <div className="p-6 pb-4 border-b border-blue-900/60 relative shrink-0">
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            className="absolute top-5 right-5 p-1 text-blue-300 hover:text-white rounded-lg hover:bg-blue-900/60 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
+          
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[11px] font-mono text-blue-950 bg-[#fbbf24] px-2.5 py-0.5 rounded-full font-extrabold shadow-xs">
+              {step === 'credentials' ? 'Step 1 of 3: Credentials' : step === 'profile' ? 'Step 2 of 3: Academic Profile' : 'Step 3 of 3: Email Verification'}
+            </span>
+          </div>
 
           <h2 className="text-xl font-extrabold text-white tracking-tight">
-            {activeRole === 'admin' ? 'Organizer Registration' : 'Student Registration'}
+            {step === 'verification' ? 'Verify Institutional Email' : `Sign Up as ${activeRole === 'student' ? 'Student' : 'Campus Organizer'}`}
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {step === 'credentials'
-              ? 'Institutional credentials for CDO campuses'
-              : 'Complete profile information'}
+          <p className="text-xs text-blue-200/80 mt-0.5">
+            {step === 'verification'
+              ? `Enter the 6-digit code sent to ${email}`
+              : `Create your verified account for USTP-CDO and Cagayan de Oro universities.`
+            }
           </p>
-
-          {step === 'credentials' && (
-            <div className="grid grid-cols-2 p-1 bg-slate-900 rounded-xl gap-1 mt-3 border border-slate-800">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveRole('admin');
-                  setErrorMsg('');
-                }}
-                className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  activeRole === 'admin'
-                    ? 'bg-[#d0f344] text-slate-950 shadow-xs'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Organizer</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveRole('student');
-                  setErrorMsg('');
-                }}
-                className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  activeRole === 'student'
-                    ? 'bg-[#d0f344] text-slate-950 shadow-xs'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>Student</span>
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* Scrollable Body */}
-        <div className="p-6 overflow-y-auto space-y-4">
-          {errorMsg && (
-            <div className="p-2.5 bg-rose-950/80 border border-rose-800 rounded-xl flex items-center gap-2 text-xs text-rose-200">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
+        {/* Body */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+          
+          {/* STEP 1: CREDENTIALS */}
+          {step === 'credentials' && (
+            <form onSubmit={handleNextToProfile} className="space-y-4">
+              
+              {/* Role Switcher */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-[#061426] border border-blue-900/80 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setActiveRole('student')}
+                  className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                    activeRole === 'student'
+                      ? 'bg-white text-blue-950 shadow-sm font-extrabold'
+                      : 'text-blue-200 hover:text-white'
+                  }`}
+                >
+                  Student Account
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveRole('admin')}
+                  className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                    activeRole === 'admin'
+                      ? 'bg-[#fbbf24] text-blue-950 shadow-sm font-extrabold'
+                      : 'text-blue-200 hover:text-white'
+                  }`}
+                >
+                  Campus Organizer
+                </button>
+              </div>
 
-          {step === 'credentials' ? (
-            <form onSubmit={handleNextStep} className="space-y-3.5">
+              {errorMsg && (
+                <div className="p-3 bg-rose-950/80 border border-rose-800 rounded-xl text-rose-200 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Full Name
+                <label className="block text-xs font-semibold text-blue-100 mb-1">
+                  Full Name (Official Record) *
                 </label>
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Maria Santos"
-                  className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-hidden focus:ring-1 focus:ring-[#d0f344]"
+                  placeholder="e.g. Juan C. Dela Cruz"
+                  className="w-full px-3 py-2 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white placeholder:text-blue-300/50 focus:outline-hidden focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-blue-100 mb-1">
                   University / College in CDO (USTP-CDO, XU, Liceo, CU, etc.)
                 </label>
                 <select
                   value={school}
                   onChange={(e) => setSchool(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-1 focus:ring-[#d0f344]"
+                  className="w-full px-3 py-2 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
                 >
                   {UNIVERSITIES.map(u => (
-                    <option key={u} value={u}>{u}</option>
+                    <option key={u} value={u} className="bg-[#0a1f3d]">{u}</option>
                   ))}
-                  <option value="Other">Other CDO College / University</option>
+                  <option value="Other" className="bg-[#0a1f3d]">Other CDO College / University</option>
                 </select>
               </div>
 
               {school === 'Other' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-blue-100 mb-1">
                     Enter CDO School Name
                   </label>
                   <input
@@ -246,7 +279,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                     value={customSchool}
                     onChange={(e) => setCustomSchool(e.target.value)}
                     placeholder="e.g. College Name in CDO"
-                    className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white"
+                    className="w-full px-3 py-2 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
                     required
                   />
                 </div>
@@ -254,149 +287,141 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
               {activeRole === 'admin' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Campus Student Organization Name
+                  <label className="block text-xs font-semibold text-blue-100 mb-1">
+                    Campus Organization / Council Name *
                   </label>
                   <input
                     type="text"
                     value={organization}
                     onChange={(e) => setOrganization(e.target.value)}
-                    placeholder="e.g. USTP CS Guild / XU Central Student Government"
-                    className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-hidden focus:ring-1 focus:ring-[#d0f344]"
+                    placeholder="e.g. Student Council, Computer Science Society"
+                    className="w-full px-3 py-2 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white placeholder:text-blue-300/50 focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
                     required
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Institutional Email (for verification)
+                <label className="block text-xs font-semibold text-blue-100 mb-1">
+                  Institutional Email Address *
                 </label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. user@school.edu.ph"
-                  className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-hidden focus:ring-1 focus:ring-[#d0f344]"
+                  placeholder="e.g. j.delacruz@ustp.edu.ph or @gmail.com"
+                  className="w-full px-3 py-2 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white placeholder:text-blue-300/50 focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Password
+                <label className="block text-xs font-semibold text-blue-100 mb-1">
+                  Password (min. 6 characters) *
                 </label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
-                  className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-hidden focus:ring-1 focus:ring-[#d0f344]"
+                  placeholder="••••••••"
+                  className="w-full px-3 py-2 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white placeholder:text-blue-300/50 focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
                   required
-                  minLength={6}
                 />
               </div>
 
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full py-2.5 px-4 text-xs font-bold text-slate-950 bg-[#d0f344] hover:bg-[#bde532] rounded-xl shadow-sm transition-all cursor-pointer"
+                  className="w-full py-2.5 px-4 text-xs font-extrabold text-blue-950 bg-[#fbbf24] hover:bg-[#f59e0b] rounded-xl transition-all cursor-pointer shadow-sm"
                 >
-                  Continue to Profile Details →
+                  Next: Academic Profile →
                 </button>
               </div>
-            </form>
-          ) : (
-            <form onSubmit={handleCompleteRegistration} className="space-y-4">
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs space-y-1">
-                <div className="font-bold text-slate-300">Registered Info (Permanent):</div>
-                <div className="text-slate-400">Name: <span className="text-white font-medium">{fullName}</span></div>
-                <div className="text-slate-400">School: <span className="text-white font-medium">{resolvedSchool}</span></div>
-                {activeRole === 'admin' && (
-                  <div className="text-slate-400">Organization: <span className="text-white font-medium">{organization}</span></div>
-                )}
-                <div className="text-[11px] text-[#d0f344] pt-1">
-                  ✓ Note: Name and School are permanently locked to preserve official record authenticity.
-                </div>
+          {/* STEP 2: PROFILE */}
+          {step === 'profile' && (
+            <form onSubmit={handleProceedToVerification} className="space-y-4">
+              
+              <div className="p-3 rounded-2xl bg-[#061426] border border-blue-900/80 text-xs space-y-1">
+                <div className="font-bold text-white">{fullName}</div>
+                <div className="text-blue-200/80">{resolvedSchool} · {email}</div>
               </div>
 
               {activeRole === 'student' ? (
                 <>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Department / College
+                    <label className="block text-xs font-semibold text-blue-100 mb-1">
+                      Academic Department / College
                     </label>
                     <select
                       value={department}
                       onChange={(e) => setDepartment(e.target.value)}
-                      className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white"
+                      className="w-full px-3 py-2 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
                     >
                       {DEPARTMENTS.map(d => (
-                        <option key={d} value={d}>{d}</option>
+                        <option key={d} value={d} className="bg-[#0a1f3d]">{d}</option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-blue-100 mb-1">
                       Degree Program / Course
                     </label>
                     <select
                       value={course}
                       onChange={(e) => setCourse(e.target.value)}
-                      className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white"
+                      className="w-full px-3 py-2 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
                     >
                       {COURSES.map(c => (
-                        <option key={c} value={c}>{c}</option>
+                        <option key={c} value={c} className="bg-[#0a1f3d]">{c}</option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Current Year Level
+                    <label className="block text-xs font-semibold text-blue-100 mb-1">
+                      Year Level
                     </label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {YEAR_LEVELS.map(yr => (
-                        <button
-                          key={yr}
-                          type="button"
-                          onClick={() => setYearLevel(yr)}
-                          className={`py-2 text-xs rounded-xl border font-bold transition-all cursor-pointer ${
-                            yearLevel === yr
-                              ? 'bg-[#d0f344] text-slate-950 border-[#d0f344]'
-                              : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
-                          }`}
-                        >
-                          {yr}
-                        </button>
+                    <select
+                      value={yearLevel}
+                      onChange={(e) => setYearLevel(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
+                    >
+                      {YEAR_LEVELS.map(y => (
+                        <option key={y} value={y} className="bg-[#0a1f3d]">{y}</option>
                       ))}
-                    </div>
+                    </select>
                   </div>
                 </>
               ) : (
                 <>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-blue-100 mb-1">
                       Position in Organization
                     </label>
                     <input
                       type="text"
                       value={position}
                       onChange={(e) => setPosition(e.target.value)}
-                      placeholder="e.g. President, Vice President, Event Head, Auditor"
-                      className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white focus:ring-1 focus:ring-[#d0f344]"
+                      placeholder="e.g. President, Vice President, Event Lead"
+                      className="w-full px-3 py-2 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white placeholder:text-blue-300/50 focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Organization Category
+                    <label className="block text-xs font-semibold text-blue-100 mb-1">
+                      Affiliated Department (Optional)
                     </label>
-                    <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-400">
-                      Standard CDO University Recognized Student Organization (USG / CSG / Guild).
-                    </div>
+                    <select
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-[#061426] border border-blue-800 rounded-xl text-white focus:ring-1 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
+                    >
+                      {DEPARTMENTS.map(d => (
+                        <option key={d} value={d} className="bg-[#0a1f3d]">{d}</option>
+                      ))}
+                    </select>
                   </div>
                 </>
               )}
@@ -405,31 +430,112 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep('credentials')}
-                  className="w-1/3 py-2.5 px-3 text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all cursor-pointer"
+                  className="w-1/3 py-2.5 px-3 text-xs font-semibold text-blue-200 bg-[#061426] hover:bg-[#081d38] rounded-xl border border-blue-800 transition-colors cursor-pointer"
                 >
                   ← Back
                 </button>
                 <button
                   type="submit"
-                  className="w-2/3 py-2.5 px-4 text-xs font-extrabold text-slate-950 bg-[#d0f344] hover:bg-[#bde532] rounded-xl shadow-sm transition-all cursor-pointer"
+                  className="w-2/3 py-2.5 px-4 text-xs font-extrabold text-blue-950 bg-[#fbbf24] hover:bg-[#f59e0b] rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center gap-1.5"
                 >
-                  Complete Registration & Launch Pass
+                  <span>Proceed to Verification</span>
+                  <KeyRound className="w-4 h-4 text-blue-950" />
                 </button>
               </div>
             </form>
           )}
 
-          {/* Switch to Login */}
-          <div className="pt-2 border-t border-slate-800 text-center text-xs text-slate-400">
-            Already have an account?{' '}
+          {/* STEP 3: EMAIL VERIFICATION (OTP) */}
+          {step === 'verification' && (
+            <form onSubmit={handleVerifyEmailAndComplete} className="space-y-4">
+              <div className="p-4 bg-[#061426] border border-blue-900/80 rounded-2xl text-center space-y-2">
+                <div className="w-12 h-12 rounded-2xl bg-[#fbbf24]/15 border border-[#fbbf24]/30 text-[#fbbf24] flex items-center justify-center mx-auto">
+                  <Mail className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Enter Email Verification Code</h4>
+                  <p className="text-xs text-blue-200/80 mt-0.5">
+                    We sent a 6-digit confirmation code to:
+                  </p>
+                  <p className="text-xs font-bold text-[#fbbf24] mt-0.5 font-mono">{email}</p>
+                </div>
+              </div>
+
+              {/* Demo Helper auto-fill button */}
+              <div className="p-3 bg-[#061426]/70 border border-blue-900/80 rounded-xl flex items-center justify-between text-xs">
+                <span className="text-blue-300/80">Generated Code:</span>
+                <button
+                  type="button"
+                  onClick={() => setEnteredOtp(generatedOtp)}
+                  className="font-mono font-bold text-[#fbbf24] hover:underline cursor-pointer bg-blue-950 px-2 py-0.5 rounded border border-blue-800"
+                >
+                  {generatedOtp} (Click to auto-fill)
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-blue-100 mb-1.5">
+                  6-Digit Verification Code
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={enteredOtp}
+                  onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  className="w-full text-center tracking-[0.4em] font-mono text-xl py-3 bg-[#061426] border border-blue-800 rounded-xl text-white focus:outline-hidden focus:ring-2 focus:ring-[#fbbf24] focus:border-[#fbbf24]"
+                  required
+                />
+              </div>
+
+              {otpError && (
+                <div className="p-3 bg-rose-950/80 border border-rose-800 rounded-xl text-rose-200 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{otpError}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setStep('profile')}
+                  className="w-1/3 py-2.5 px-3 text-xs font-semibold text-blue-200 bg-[#061426] hover:bg-[#081d38] rounded-xl border border-blue-800 transition-colors cursor-pointer"
+                >
+                  ← Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={isVerifying}
+                  className="w-2/3 py-2.5 px-4 text-xs font-extrabold text-blue-950 bg-[#fbbf24] hover:bg-[#f59e0b] rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isVerifying ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-blue-950 border-t-transparent rounded-full animate-spin" />
+                      <span>Verifying Email...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-blue-950" />
+                      <span>Verify Email & Complete Sign Up</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Footer toggle to Login */}
+          <div className="pt-2 text-center text-xs text-blue-200/80 border-t border-blue-900/60">
+            <span>Already have an account? </span>
             <button
               type="button"
               onClick={() => onSwitchToLogin(activeRole)}
-              className="text-[#d0f344] hover:underline font-bold cursor-pointer"
+              className="text-[#fbbf24] hover:underline font-bold cursor-pointer inline-flex items-center gap-1"
             >
-              Sign In to {activeRole === 'admin' ? 'Organizer' : 'Student'} Login
+              Sign In Here
             </button>
           </div>
+
         </div>
       </div>
     </div>

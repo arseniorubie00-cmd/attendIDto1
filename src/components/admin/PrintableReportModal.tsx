@@ -50,6 +50,28 @@ export const PrintableReportModal: React.FC<PrintableReportModalProps> = ({
     window.print();
   };
 
+  const handleExportCSV = () => {
+    const headers = ['No.', 'Student Name', 'Department', 'Course', 'Year Level', 'Time-In', 'Scan Station', 'School'];
+    const rows = filteredList.map((rec, i) => [
+      i + 1,
+      `"${rec.studentName.replace(/"/g, '""')}"`,
+      `"${rec.department.replace(/"/g, '""')}"`,
+      `"${rec.course.replace(/"/g, '""')}"`,
+      `"${rec.yearLevel.replace(/"/g, '""')}"`,
+      `"${rec.timeIn}"`,
+      `"${rec.stationId.replace(/"/g, '""')}"`,
+      `"${rec.school.replace(/"/g, '""')}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `${event.title.replace(/[^a-zA-Z0-9]/g, '_')}_attendance_roster.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
       <div 
@@ -69,15 +91,22 @@ export const PrintableReportModal: React.FC<PrintableReportModalProps> = ({
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handlePrint}
-              className="py-2 px-4 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer allow-print"
+              onClick={handleExportCSV}
+              className="py-2 px-3.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >
-              <Printer className="w-4 h-4" />
+              <Download className="w-4 h-4 text-slate-600" />
+              <span>Export CSV / Excel</span>
+            </button>
+            <button
+              onClick={handlePrint}
+              className="py-2 px-4 text-xs font-bold text-slate-950 bg-[#d0f344] hover:bg-[#bde532] rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer allow-print"
+            >
+              <Printer className="w-4 h-4 text-slate-950" />
               <span>Print Official Sheet</span>
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-200 transition-colors"
+              className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>

@@ -61,6 +61,10 @@ export interface CampusEvent {
   targetFilter: EventTargetFilter;
   bannerUrl?: string;
   status: 'upcoming' | 'ongoing' | 'completed';
+  isPaid?: boolean;
+  paymentMethod?: 'GCash' | 'Maya' | 'GoTyme' | 'GrabPay' | 'Bank Transfer';
+  referenceNumber?: string;
+  amountPaid?: number;
   createdAt: string;
 }
 

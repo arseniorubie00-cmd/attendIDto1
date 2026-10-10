@@ -91,8 +91,15 @@ export function useAppStore() {
           setStored(STORAGE_KEYS.ATTENDANCE, data.attendance);
         }
         if (data.notifications) {
-          setNotificationsState(data.notifications);
-          setStored(STORAGE_KEYS.NOTIFICATIONS, data.notifications);
+          setNotificationsState(prev => {
+            const readMap = new Map(prev.filter(n => n.read).map(n => [n.id, true]));
+            const merged = (data.notifications as AppNotification[]).map(n => ({
+              ...n,
+              read: n.read || !!readMap.get(n.id)
+            }));
+            setStored(STORAGE_KEYS.NOTIFICATIONS, merged);
+            return merged;
+          });
         }
       }
     } catch {
@@ -103,7 +110,7 @@ export function useAppStore() {
   // Poll server periodically for multi-device live attendance and new events
   useEffect(() => {
     syncWithServer();
-    const interval = setInterval(syncWithServer, 3500);
+    const interval = setInterval(syncWithServer, 2000);
 
     const handleFocus = () => syncWithServer();
     window.addEventListener('focus', handleFocus);
@@ -512,12 +519,54 @@ export function useAppStore() {
   );
 
   const markNotificationRead = useCallback((id: string) => {
+    // 1. Instantly update local state so red dot disappears immediately
     setNotificationsState(prev => {
       const updated = prev.map(n => (n.id === id ? { ...n, read: true } : n));
       setStored(STORAGE_KEYS.NOTIFICATIONS, updated);
       return updated;
     });
+
+    // 2. Persist to server database so polling doesn't bring back the red dot
+    fetch(`/api/notifications/${id}/read`, {
+      method: 'PUT'
+    }).catch(err => console.error('Failed to persist notification read state:', err));
   }, []);
+
+  const markAllNotificationsRead = useCallback((userId?: string) => {
+    // 1. Instantly mark all as read locally
+    setNotificationsState(prev => {
+      const updated = prev.map(n => ({ ...n, read: true }));
+      setStored(STORAGE_KEYS.NOTIFICATIONS, updated);
+      return updated;
+    });
+
+    // 2. Persist to server database
+    fetch('/api/notifications/read-all', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    }).catch(err => console.error('Failed to persist all notifications read state:', err));
+  }, []);
+
+  // Verify Email Address
+  const verifyEmail = useCallback(async (email: string, role: 'student' | 'admin'): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, role })
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        syncWithServer();
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }, [setCurrentUser, syncWithServer]);
 
   // Toggle RSVP / Save Event for Student
   const toggleSaveEvent = useCallback((studentId: string, eventId: string) => {
@@ -573,6 +622,8 @@ export function useAppStore() {
     createEvent,
     recordAttendance,
     markNotificationRead,
+    markAllNotificationsRead,
+    verifyEmail,
     toggleSaveEvent
   };
 }

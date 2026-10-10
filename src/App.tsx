@@ -27,6 +27,8 @@ export default function App() {
     createEvent,
     recordAttendance,
     markNotificationRead,
+    markAllNotificationsRead,
+    verifyEmail,
     toggleSaveEvent
   } = useAppStore();
 
@@ -65,7 +67,7 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans selection:bg-[#d0f344] selection:text-slate-950 ${!currentUser ? 'bg-[#0c1017] text-white' : 'bg-slate-50 text-slate-900'}`}>
+    <div className={`min-h-screen flex flex-col font-sans selection:bg-[#fbbf24] selection:text-blue-950 ${!currentUser ? 'bg-[#07172c] text-white' : 'bg-slate-50 text-slate-900'}`}>
       {/* Top Bar Header */}
       <Navbar
         currentUser={currentUser}
@@ -93,7 +95,10 @@ export default function App() {
             onUpdateProfile={updateStudentProfile}
             onOpenPassModal={() => setIsStudentPassOpen(true)}
             onMarkNotificationRead={markNotificationRead}
+            onMarkAllNotificationsRead={markAllNotificationsRead}
+            onVerifyEmail={verifyEmail}
             onToggleSaveEvent={toggleSaveEvent}
+            onLogout={logout}
           />
         ) : (
           <AdminDashboard
@@ -104,30 +109,32 @@ export default function App() {
             onUpdateProfile={updateAdminProfile}
             onCreateEvent={createEvent}
             onScanStudent={recordAttendance}
+            onVerifyEmail={verifyEmail}
+            onLogout={logout}
           />
         )}
       </main>
 
-      {/* Authentic AttendIDto Footer */}
-      <footer className="bg-[#080b10] border-t border-slate-800/80 py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-400 no-print">
+      {/* Authentic AttendIDto USTP Footer */}
+      <footer className="bg-[#051122] border-t border-blue-900/60 py-8 px-4 sm:px-6 lg:px-8 text-xs text-blue-200/70 no-print">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-slate-900 border border-slate-700 flex items-center justify-center">
+            <div className="w-6 h-6 rounded-md bg-[#0a2540] border border-blue-800 flex items-center justify-center">
               <svg viewBox="0 0 32 32" className="w-3.5 h-3.5" aria-hidden="true">
                 <path d="m7 24 9-19 9 19M11 17h10" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="25" cy="6" r="3" fill="#d0f344" />
+                <circle cx="25" cy="6" r="3" fill="#fbbf24" />
               </svg>
             </div>
             <span className="font-extrabold text-white">
-              Attend<span className="text-[#d0f344]">IDto</span>
+              Attend<span className="text-[#fbbf24]">IDto</span>
             </span>
-            <span className="text-slate-600">·</span>
-            <span className="text-slate-400">A little less admin. A lot more campus.</span>
+            <span className="text-blue-400/50">·</span>
+            <span className="text-blue-200/80">USTP-CDO & CDO Campus Event Platform</span>
           </div>
 
-          <div className="flex items-center gap-4 text-xs font-semibold text-slate-400">
-            <span className="text-[#d0f344] font-mono tracking-wider text-[11px]">
-              YOUR CAMPUS. YOUR PASS.
+          <div className="flex items-center gap-4 text-xs font-semibold text-blue-200">
+            <span className="text-[#fbbf24] font-mono tracking-wider text-[11px]">
+              USTP BLUE · WHITE · GOLD
             </span>
           </div>
         </div>

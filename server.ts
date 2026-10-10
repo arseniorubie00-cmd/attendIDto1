@@ -421,6 +421,59 @@ async function startServer() {
     res.json({ success: true, savedEventIds: nextSaved });
   });
 
+  // API ROUTE 10: Mark Single Notification as Read
+  app.put('/api/notifications/:id/read', (req, res) => {
+    const notifId = req.params.id;
+    const db = readDb();
+    const notifIndex = db.notifications.findIndex((n: any) => n.id === notifId);
+    if (notifIndex !== -1) {
+      db.notifications[notifIndex].read = true;
+      writeDb(db);
+    }
+    res.json({ success: true });
+  });
+
+  // API ROUTE 11: Mark All Notifications as Read
+  app.put('/api/notifications/read-all', (req, res) => {
+    const { userId } = req.body || {};
+    const db = readDb();
+    db.notifications = db.notifications.map((n: any) => {
+      if (!userId || n.targetUserId === 'all' || n.targetUserId === 'all_students' || n.targetUserId === userId) {
+        return { ...n, read: true };
+      }
+      return n;
+    });
+    writeDb(db);
+    res.json({ success: true });
+  });
+
+  // API ROUTE 12: Verify Email Address
+  app.post('/api/auth/verify-email', (req, res) => {
+    const { email, role } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required.' });
+    }
+    const cleanEmail = String(email).trim().toLowerCase();
+    const db = readDb();
+
+    if (role === 'admin') {
+      const idx = db.admins.findIndex((a: any) => a.email.toLowerCase() === cleanEmail);
+      if (idx !== -1) {
+        db.admins[idx].emailVerified = true;
+        writeDb(db);
+        return res.json({ success: true, user: db.admins[idx] });
+      }
+    } else {
+      const idx = db.students.findIndex((s: any) => s.email.toLowerCase() === cleanEmail);
+      if (idx !== -1) {
+        db.students[idx].emailVerified = true;
+        writeDb(db);
+        return res.json({ success: true, user: db.students[idx] });
+      }
+    }
+    res.status(404).json({ success: false, message: 'Account not found.' });
+  });
+
   // Mount Vite Middleware in Development
   if (process.env.NODE_ENV === 'production' && fs.existsSync(path.resolve(__dirname, 'dist'))) {
     app.use(express.static(path.resolve(__dirname, 'dist')));
